@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>闲鱼运营工作台 MVP</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">闲</div>
+      <div>
+        <strong>闲鱼运营工作台</strong>
+        <span>Local MVP</span>
+      </div>
+    </div>
+    <nav>
+      <button class="nav active" data-tab="dashboard">总览</button>
+      <button class="nav" data-tab="accounts">账号</button>
+      <button class="nav" data-tab="collector">采集统计</button>
+      <button class="nav" data-tab="trends">趋势分析</button>
+      <button class="nav" data-tab="publish">自动发布</button>
+      <button class="nav" data-tab="reply">自动回复</button>
+      <button class="nav" data-tab="delivery">自动发货</button>
+      <button class="nav" data-tab="logs">风险日志</button>
+    </nav>
+    <button id="seedDemo" class="secondary full">生成演示数据</button>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="pageTitle">总览</h1>
+        <p id="pageHint">本地单机版，当前使用模拟适配器；高风险动作全部走队列和审计。</p>
+      </div>
+      <div class="actions">
+        <label class="switch">
+          <input id="killSwitch" type="checkbox" />
+          <span></span>
+          <b>全局暂停</b>
+        </label>
+        <button id="refresh" class="primary">刷新</button>
+      </div>
+    </header>
+
+    <section id="dashboard" class="tab active">
+      <div class="stats" id="stats"></div>
+      <div class="grid two">
+        <section class="panel">
+          <h2>队列状态</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>模式</th><th>状态</th><th>错误</th><th>更新</th></tr></thead>
+              <tbody id="dashboardJobs"></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <h2>最近风险</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>级别</th><th>类型</th><th>处理</th><th>时间</th></tr></thead>
+              <tbody id="dashboardRisks"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="accounts" class="tab">
+      <div class="grid two">
+        <section class="panel">
+          <h2>新增账号</h2>
+          <form id="accountForm" class="form">
+            <label>名称<input name="name" placeholder="例如：主账号" required /></label>
+            <label>平台用户 ID<input name="platform_user_id" placeholder="可选，unb 或备注 ID" /></label>
+            <label>登录态 / Cookie<textarea name="login_state" rows="4" placeholder="粘贴 goofish.com Cookie 字符串，或 Playwright storage state JSON；只本地加密保存"></textarea></label>
+            <label>每日发布上限<input name="daily_publish_limit" type="number" min="1" value="5" /></label>
+            <div class="checks">
+              <label><input name="auto_publish_enabled" type="checkbox" /> 全自动发布</label>
+              <label><input name="auto_reply_enabled" type="checkbox" checked /> 自动回复</label>
+              <label><input name="auto_delivery_enabled" type="checkbox" /> 自动发货</label>
+            </div>
+            <button class="primary">保存账号</button>
+          </form>
+        </section>
+        <section class="panel">
+          <h2>账号列表</h2>
+          <p class="muted">需要真实采集时，点“登录向导”打开专用浏览器窗口，手动登录闲鱼后再点“保存登录态”。</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>名称</th><th>状态</th><th>能力</th><th>登录态</th><th>操作</th></tr></thead>
+              <tbody id="accountsTable"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="collector" class="tab">
+      <div class="grid two">
+        <section class="panel">
+          <h2>采集任务</h2>
+          <form id="collectorForm" class="form inline">
+            <label>账号<select name="account_id" class="accountSelect"><option value="">无账号</option></select></label>
+            <label>关键词<input name="keyword" value="相机" required /></label>
+            <label>数量<input name="limit" type="number" min="1" max="20" value="8" /></label>
+            <button class="primary">运行采集</button>
+          </form>
+          <p class="muted">真实采集需要保存了 goofish.com Cookie 或 storage state 的账号；遇到验证码、滑块、登录失效或风控会停止，不会自动绕过。</p>
+        </section>
+        <section class="panel">
+          <h2>统计</h2>
+          <div id="analytics" class="analytics"></div>
+        </section>
+      </div>
+      <section class="panel">
+        <h2>商品结果池</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>商品</th><th>价格</th><th>地区</th><th>卖家</th><th>想要/浏览/销量</th><th>操作</th></tr></thead>
+            <tbody id="itemsTable"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section id="trends" class="tab">
+      <section class="panel">
+        <h2>历史趋势筛选</h2>
+        <form id="trendForm" class="form inline trend-form">
+          <label>关键词<input name="keyword" value="相机" list="keywordList" placeholder="留空看全部" /></label>
+          <datalist id="keywordList"></datalist>
+          <label>商品 ID<input name="item_id" placeholder="可选，查看单品" /></label>
+          <label>时间范围
+            <select name="days">
+              <option value="7">近 7 天</option>
+              <option value="30" selected>近 30 天</option>
+              <option value="90">近 90 天</option>
+              <option value="180">近 180 天</option>
+              <option value="365">近 365 天</option>
+            </select>
+          </label>
+          <label>粒度
+            <select name="bucket">
+              <option value="day" selected>按天</option>
+              <option value="hour">按小时</option>
+            </select>
+          </label>
+          <button class="primary">查看趋势</button>
+        </form>
+        <p class="muted">趋势来自本地采集快照。真实销量只有在平台接口暴露成交/销量字段时才会显示，否则以想要、浏览、排名变化作为热度代理。</p>
+      </section>
+      <div class="grid two">
+        <section class="panel">
+          <h2>趋势指标</h2>
+          <div id="trendMetrics" class="analytics"></div>
+        </section>
+        <section class="panel">
+          <h2>最近关键词</h2>
+          <div id="trendKeywords" class="keyword-list"></div>
+        </section>
+      </div>
+      <section class="panel">
+        <h2>价格 / 热度曲线</h2>
+        <div class="chart-wrap">
+          <svg id="trendChart" class="chart" role="img" aria-label="价格和热度趋势图"></svg>
+        </div>
+        <div class="legend">
+          <span><b class="line-price"></b>均价</span>
+          <span><b class="line-want"></b>平均想要</span>
+          <span><b class="line-sales"></b>销量增量</span>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>商品趋势排行</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>商品</th><th>样本</th><th>均价</th><th>价格区间</th><th>想要增量</th><th>浏览增量</th><th>销量增量</th><th>最佳排名</th></tr></thead>
+            <tbody id="trendItemsTable"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section id="publish" class="tab">
+      <div class="grid two">
+        <section class="panel">
+          <h2>发布草稿</h2>
+          <form id="draftForm" class="form">
+            <label>账号<select name="account_id" class="accountSelect" required></select></label>
+            <label>来源商品 ID<input name="source_item_id" placeholder="可选" /></label>
+            <label>标题<input name="title" required /></label>
+            <label>描述<textarea name="description" rows="4" required></textarea></label>
+            <label>价格<input name="price" type="number" min="0.01" step="0.01" required /></label>
+            <label>地址<input name="address" placeholder="可选" /></label>
+            <button class="primary">保存草稿</button>
+          </form>
+        </section>
+        <section class="panel">
+          <h2>发布队列</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>草稿</th><th>模式</th><th>状态</th><th>错误/结果</th><th>操作</th></tr></thead>
+              <tbody id="publishJobsTable"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <section class="panel">
+        <h2>草稿列表</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>标题</th><th>价格</th><th>状态</th><th>地址</th><th>操作</th></tr></thead>
+            <tbody id="draftsTable"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section id="reply" class="tab">
+      <div class="grid two">
+        <section class="panel">
+          <h2>回复规则</h2>
+          <form id="replyRuleForm" class="form">
+            <label>账号<select name="account_id" class="accountSelect"><option value="">全部账号</option></select></label>
+            <label>关键词<input name="keyword" required /></label>
+            <label>回复内容<textarea name="reply_text" rows="3" required></textarea></label>
+            <label>优先级<input name="priority" type="number" value="10" /></label>
+            <button class="primary">新增规则</button>
+          </form>
+        </section>
+        <section class="panel">
+          <h2>模拟来信</h2>
+          <form id="messageForm" class="form">
+            <label>账号<select name="account_id" class="accountSelect" required></select></label>
+            <label>买家<input name="sender_name" value="买家" /></label>
+            <label>内容<textarea name="inbound_text" rows="4" required>在吗，包邮吗？</textarea></label>
+            <button class="primary">模拟自动回复</button>
+          </form>
+        </section>
+      </div>
+      <div class="grid two">
+        <section class="panel">
+          <h2>规则列表</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>账号</th><th>关键词</th><th>回复</th><th>优先级</th></tr></thead>
+              <tbody id="replyRulesTable"></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <h2>消息日志</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>买家消息</th><th>策略</th><th>回复</th><th>状态</th></tr></thead>
+              <tbody id="messagesTable"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="delivery" class="tab">
+      <div class="grid two">
+        <section class="panel">
+          <h2>发货规则</h2>
+          <form id="deliveryRuleForm" class="form">
+            <label>账号<select name="account_id" class="accountSelect" required></select></label>
+            <label>关键词<input name="keyword" required /></label>
+            <label>内容类型<select name="content_type"><option value="text">文本/卡密</option><option value="image">图片</option><option value="api">外部 API</option></select></label>
+            <label>发货内容<textarea name="content" rows="4" required></textarea></label>
+            <label>冷却秒数<input name="cooldown_seconds" type="number" min="0" value="600" /></label>
+            <div class="checks"><label><input name="auto_confirm" type="checkbox" /> 同时自动确认发货</label></div>
+            <button class="primary">新增发货规则</button>
+          </form>
+        </section>
+        <section class="panel">
+          <h2>模拟付款触发</h2>
+          <form id="deliveryJobForm" class="form">
+            <label>账号<select name="account_id" class="accountSelect" required></select></label>
+            <label>订单 ID<input name="order_id" value="order-demo-001" /></label>
+            <label>商品/消息<textarea name="message" rows="4" required>我已付款，虚拟资料等待发货</textarea></label>
+            <button class="primary">模拟自动发货</button>
+          </form>
+        </section>
+      </div>
+      <div class="grid two">
+        <section class="panel">
+          <h2>发货规则列表</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>关键词</th><th>类型</th><th>自动确认</th><th>冷却</th></tr></thead>
+              <tbody id="deliveryRulesTable"></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <h2>发货任务</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>订单</th><th>状态</th><th>确认</th><th>错误</th></tr></thead>
+              <tbody id="deliveryJobsTable"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="logs" class="tab">
+      <div class="grid two">
+        <section class="panel">
+          <h2>风险事件</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>账号</th><th>级别</th><th>类型</th><th>消息</th><th>处理</th></tr></thead>
+              <tbody id="riskTable"></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <h2>审计日志</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>动作</th><th>对象</th><th>账号</th><th>时间</th></tr></thead>
+              <tbody id="auditTable"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
